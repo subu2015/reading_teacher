@@ -1,4 +1,4 @@
-# 📚 Reading Teacher 2.0
+# 📚 Reading Teacher
 
 An advanced AI-powered reading assistant designed specifically for 5-year-old children learning to read English. This comprehensive system combines story generation, speech recognition, adaptive learning, and detailed assessment to create a personalized reading experience.
 

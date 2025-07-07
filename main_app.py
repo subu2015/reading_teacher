@@ -5,11 +5,12 @@ import json
 from story_generator import StoryGenerator
 from speech_engine import SpeechRecognitionEngine, WordHighlighter
 from assessment_engine import AssessmentEngine
+import glob
 
 class ReadingTeacherApp:
     def __init__(self):
         st.set_page_config(
-            page_title="Reading Teacher 2.0",
+            page_title="Reading Teacher",
             page_icon="📚",
             layout="wide",
             initial_sidebar_state="expanded"
@@ -51,7 +52,7 @@ class ReadingTeacherApp:
     def main(self):
         """Main application interface"""
         # Header
-        st.title("📚 Reading Teacher 2.0")
+        st.title("📚 Reading Teacher")
         st.markdown("### Your AI-powered reading adventure! 🚀")
         
         # User type selector
@@ -63,6 +64,11 @@ class ReadingTeacherApp:
                 index=0 if st.session_state.user_type == "child" else 1
             )
             st.session_state.user_type = user_type
+        
+        # Show pending story editor if needed
+        if st.session_state.get("show_pending_story_editor", False):
+            self.pending_story_line_editor()
+            return
         
         # Main content based on user type
         if user_type == "child":
@@ -97,10 +103,28 @@ class ReadingTeacherApp:
             # Quick actions
             st.subheader("🎮 Quick Actions")
             if st.button("🎨 New Story"):
-                self.create_new_story()
+                st.session_state.show_new_story_form = True
+            
+            # Load existing story
+            story_files = glob.glob('stories/*.json')
+            story_files = [os.path.basename(f) for f in story_files]
+            if story_files:
+                selected_story = st.selectbox("📂 Load Existing Story:", ["(Select a story)"] + story_files)
+                if selected_story != "(Select a story)":
+                    if st.button("📖 Load Story"):
+                        story = self.story_generator.load_story_from_file(selected_story)
+                        if story:
+                            self.story_generator.save_story_to_session(story)
+                            st.success(f"Loaded story: {story['title']}")
+                            st.rerun()
             
             if st.button("📊 My Progress"):
                 st.session_state.show_progress = True
+        
+        # Show new story form if requested
+        if st.session_state.get("show_new_story_form", False):
+            self.new_story_form()
+            return
         
         # Main content tabs
         tab1, tab2, tab3, tab4 = st.tabs(["📖 Read Story", "🎮 Word Games", "📊 My Progress", "🏠 Home"])
@@ -119,8 +143,13 @@ class ReadingTeacherApp:
     
     def story_reading_interface(self):
         """Story reading interface with speech recognition"""
-        st.header("📖 Read Your Story")
-        
+        st.header("�� Read Your Story")
+        # Story Line Editor button
+        if st.button("✏️ Edit Story Lines"):
+            st.session_state.show_story_editor = True
+        if st.session_state.get("show_story_editor", False):
+            self.story_line_editor()
+            return
         if not st.session_state.current_story:
             st.info("🎨 Click 'New Story' in the sidebar to start your reading adventure!")
             return
@@ -143,7 +172,11 @@ class ReadingTeacherApp:
         with col1:
             # Story illustration
             if page.get("illustration_url"):
-                st.image(page["illustration_url"], use_container_width=True)
+                illustration_url = page["illustration_url"]
+                if os.path.exists(illustration_url):
+                    st.image(illustration_url, use_container_width=True)
+                else:
+                    st.image(illustration_url, use_container_width=True)
             else:
                 st.info("🎨 Illustration loading...")
         
@@ -423,6 +456,98 @@ class ReadingTeacherApp:
         
         st.success("🎉 Story completed! Great job reading!")
         st.balloons()
+
+    def story_line_editor(self):
+        """Show an editor for all story lines and illustration prompts, indexed by page number."""
+        story = st.session_state.current_story
+        st.subheader("📝 Story Line Editor")
+        edited = False
+        for i, page in enumerate(story["pages"]):
+            st.markdown(f"**Page {i+1}:**")
+            new_text = st.text_area(f"Story Text (Page {i+1})", value=page["text"], key=f"edit_text_{i}")
+            new_prompt = st.text_area(f"Illustration Prompt (Page {i+1})", value=page.get("illustration_prompt", ""), key=f"edit_prompt_{i}")
+            if new_text != page["text"] or new_prompt != page.get("illustration_prompt", ""):
+                page["text"] = new_text
+                page["illustration_prompt"] = new_prompt
+                edited = True
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Edits"):
+                self.story_generator.save_story_to_session(story)
+                self.story_generator.save_story_to_file(story)
+                st.success("Story edits saved!")
+                st.session_state.show_story_editor = False
+                st.rerun()
+        with col2:
+            if st.button("🎨 Re-generate Images (New Version)"):
+                new_story = self.story_generator.regenerate_images_for_story(story)
+                self.story_generator.save_story_to_session(new_story)
+                st.success("Images re-generated and saved as a new version!")
+                st.session_state.show_story_editor = False
+                st.rerun()
+        if st.button("❌ Close Editor"):
+            st.session_state.show_story_editor = False
+            st.rerun()
+
+    def new_story_form(self):
+        """Interactive form for new story creation: theme, genre, and custom outline."""
+        st.header("🎨 Create a New Story")
+        with st.form("new_story_form"):
+            themes = ["space", "unicorn", "disney world", "saturn", "number blocks"]
+            genres = ["adventure", "mystery", "friendship", "fantasy", "silly", "educational"]
+            theme = st.selectbox("Choose a story theme:", themes)
+            genre = st.selectbox("Choose a story genre:", genres)
+            user_outline = st.text_area("Chat with the AI: What should your story be about? (Optional)", "")
+            submitted = st.form_submit_button("Generate Story Outline!")
+        if submitted:
+            st.session_state.show_new_story_form = False
+            # Generate only the outline, not images or saving yet
+            outline = self.story_generator.generate_story_outline(
+                st.session_state.reading_level,
+                theme=theme,
+                genre=genre,
+                user_outline=user_outline
+            )
+            if outline:
+                st.session_state.pending_story_outline = outline
+                st.session_state.show_pending_story_editor = True
+                st.rerun()
+            else:
+                st.error("😕 Sorry, I couldn't create a story outline right now. Try again!")
+
+    def pending_story_line_editor(self):
+        """Show the story line editor for a pending new story outline before images are generated."""
+        story = st.session_state.pending_story_outline
+        st.subheader("📝 Review and Edit Your Story Outline")
+        for i, page in enumerate(story["pages"]):
+            st.markdown(f"**Page {i+1}:**")
+            new_text = st.text_area(f"Story Text (Page {i+1})", value=page["text"], key=f"pending_edit_text_{i}")
+            new_prompt = st.text_area(f"Illustration Prompt (Page {i+1})", value=page.get("illustration_prompt", ""), key=f"pending_edit_prompt_{i}")
+            page["text"] = new_text
+            page["illustration_prompt"] = new_prompt
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Accept and Generate Images"):
+                # Now save and generate images
+                final_story = self.story_generator.create_complete_story(
+                    story["reading_level"],
+                    theme=story["theme"],
+                    genre=story.get("genre", ""),
+                    user_outline=""
+                )
+                if final_story:
+                    self.story_generator.save_story_to_session(final_story)
+                    st.success(f"🎉 Your story '{final_story['title']}' is ready!")
+                    st.session_state.show_pending_story_editor = False
+                    st.session_state.pending_story_outline = None
+                    st.rerun()
+                else:
+                    st.error("😕 Sorry, I couldn't create the full story right now. Try again!")
+        with col2:
+            if st.button("❌ Cancel"):
+                st.session_state.show_pending_story_editor = False
+                st.session_state.pending_story_outline = None
+                st.rerun()
 
 if __name__ == "__main__":
     app = ReadingTeacherApp()
