@@ -1,6 +1,6 @@
 # 📚 Reading Teacher
 
-An advanced AI-powered reading assistant designed specifically for 5-year-old children learning to read English. This comprehensive system combines story generation, speech recognition, adaptive learning, and detailed assessment to create a personalized reading experience.
+An AI-powered reading assistant designed for ~5-year-old children learning to read English. This comprehensive system combines story generation, speech recognition, adaptive learning, and detailed assessment to create a personalized reading experience.
 
 ## 🌟 Advanced Features
 
@@ -9,6 +9,7 @@ An advanced AI-powered reading assistant designed specifically for 5-year-old ch
 - **AI Illustrations**: DALL-E 3 generated child-friendly illustrations for each page
 - **Adaptive Content**: Stories adjust based on child's reading level and word mastery
 - **Multiple Themes**: Adventure, animals, space, fairy tales, nature, friendship
+- **Idea**: The stories can be shared on an online repo, and tweaked by parents to be more appropriate / interesting for their child. In this case, AI-generation is not as important as a AI-guided tweaks.
 
 ### 🎤 Speech Recognition & Word Highlighting
 - **Real-time Listening**: Advanced speech recognition using Whisper and Google STT
